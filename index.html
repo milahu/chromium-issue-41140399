@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <!-- no effect:
+  <meta name="viewport" content="width=1120">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  -->
+  <title>Chromium Zoom Reset Repro</title>
+  <style>
+    div { margin-bottom: 0.5em; }
+  </style>
+</head>
+<body>
+<h2>Zoom Reset Reproduction</h2>
+<div>Reproduce <a href="https://issues.chromium.org/issues/41140399">Zoom constantly resetting to 100% even with 125% set as default</a></div>
+<div>source: <a href="https://github.com/milahu/chromium-issue-41140399">github.com/milahu/chromium-issue-41140399</a></div>
+<div>
+  step 1:
+  open this file over the <code>file</code> protocol. example:
+  <pre>git clone --depth=1 https://github.com/milahu/chromium-issue-41140399
+cd chromium-issue-41140399
+chromium ./index.html</pre>
+</div>
+<div>
+  step 2:
+  in your display manager, set the <b>display density</b> to a <b>fractional DPI value</b>.
+  <br>
+  "fractional" as in: not a multiple of 25% (24 dpi),
+  <br>
+  for example 140% (134.4 dpi) or 120% (115.2 dpi).
+  <br>
+  example:
+  KDE plasma &rarr; system settings &rarr; display &amp; monitor &rarr; scale: 140%
+</div>
+<div>
+  step 3:
+  change the page zoom level away from 100%, for example to 150%.
+</div>
+<div>
+  step 4:
+  click some of the following links.
+  <br>
+  these links should <b>randomly change the zoom level</b>:
+  <br>
+  <a href="#init" onclick="onClickLink(this)">Set hash via link</a>
+  <a href="javascript: setLocationHash()">Set hash via location.hash</a>
+  <a href="javascript: callReplaceStateHash()">Set hash via replaceState</a>
+  <br>
+  these links should preserve the zoom level:
+  <br>
+  <a href="javascript: callReplaceStateState()">Set state via replaceState</a>
+</div>
+<div>devicePixelRatio: <code id="devicePixelRatioViewer"></code></div>
+<div>zoom: <code id="zoomViewer"></code></div>
+<div>display density: <code id="displayDensityViewer"></code></div>
+<div>counter: <code id="counterViewer"></code></div>
+<div>hash: <code id="hashViewer"></code></div>
+<script>
+let counter = -1;
+
+const devicePixelRatioViewerElem = document.getElementById("devicePixelRatioViewer");
+const zoomViewerElem = document.getElementById("zoomViewer");
+const displayDensityViewerElem = document.getElementById("displayDensityViewer");
+
+const counterViewerElem = document.getElementById("counterViewer");
+const hashViewerElem = document.getElementById("hashViewer");
+
+// Create a hidden element of known size
+const zoomTestEl = document.createElement('div');
+zoomTestEl.style.width = '100px';
+zoomTestEl.style.position = 'absolute';
+zoomTestEl.style.visibility = 'hidden';
+document.body.appendChild(zoomTestEl);
+
+/**
+ * Check if a number (as percent) is approximately a multiple of 25%
+ * @param {number} percent - the number in percent, e.g., 149.912109375
+ * @param {number} epsilon - optional tolerance (default 0.5%)
+ * @returns {boolean}
+ */
+function isApproxMultipleOf25(percent, epsilon = 0.5) {
+  const remainder = percent % 25;
+  return remainder <= epsilon || remainder >= 25 - epsilon;
+}
+
+function updateZoom() {
+  const dpr = window.devicePixelRatio;
+  const isIntegerDPR = Number.isInteger(dpr * 4);
+  // devicePixelRatioViewerElem.innerText = `${dpr} = ${dpr/0.25}/4 (integer numerator: ${isIntegerDPR})`;
+  devicePixelRatioViewerElem.innerText = `${dpr} = ${dpr/0.25}/4`;
+
+  // const zoom = window.outerWidth / window.innerWidth;
+  // round to integer percent zoom value
+  const zoom = Math.round(window.outerWidth / window.innerWidth * 100) / 100;
+  zoomViewerElem.innerText = `${zoom*100}%`;
+
+  // round to integer dpi value
+  const dpi = Math.round(dpr / zoom * 96);
+
+  // const isStandardDensity = isApproxMultipleOf25(dpr / zoom * 100);
+  const isStandardDensity = isApproxMultipleOf25(dpi / 96 * 100);
+
+  displayDensityViewerElem.innerText = `${dpi / 96 * 100}% = ${dpi} dpi (multiple of 25%: ${isStandardDensity})`;
+}
+updateZoom();
+window.addEventListener('resize', () => {
+  updateZoom();
+});
+window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener("change", () => {
+  updateZoom();
+});
+
+function incrementCounter() {
+  counter++;
+  counterViewerElem.innerText = counter;
+}
+incrementCounter();
+
+window.addEventListener("hashchange", () => {
+  hashViewerElem.innerText = window.location.hash;
+});
+
+function onClickLink(link) {
+  incrementCounter();
+  link.href = `#link-${counter}`;
+}
+function setLocationHash() {
+  incrementCounter();
+  window.location.hash = `wlh-${counter}`;
+}
+function callReplaceStateHash() {
+  incrementCounter();
+  history.replaceState(null, '', `#rsh-${counter}`);
+}
+function callReplaceStateState() {
+  incrementCounter();
+  history.replaceState({ counter }, '');
+}
+</script>
+</body>
+</html>
